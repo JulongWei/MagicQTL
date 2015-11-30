@@ -1,0 +1,126 @@
+#
+library(MagicQTL)
+
+#I scan the genome of Arabidophsis
+rm(list=ls())
+phe.name<-c("PMN","CXCL1")
+nphe<-length(phe.name)
+Phe<-read.csv(file="CC.phe.impute.csv",header=TRUE)
+Phe<-data.frame(subject.id=Phe[,1],PMN=log(Phe[,2]),CXCL1=log(Phe[,3]))
+indi<-nrow(Phe)
+load(file="CC.chrs.magic.RData")
+load(file="CC.chrs.kkship.RData")
+#
+models<-c("Random-A","Random-B","Fixed-A","Fixed-B","IM")
+nm<-length(models)
+lapply(1:nphe,function(k){
+
+   path<-paste("./Data/CC/",phe.name[k],"/",sep="")   
+   dir.create(path=path,recursive=TRUE,show=FALSE)
+   ii<-k+1
+   d<-data.frame(y=Phe[,ii],x=rep(1,indi))   
+   mc<-1
+   tmp<-mclapply(1:nm,function(i){
+#   
+     s0<-Sys.time()
+     cat(phe.name[k],"\n")
+     scans<-magicScan(dataframe=d,gen=gen,map=map,kk.eigen=kk.eigen,model=model,nfounders=19,window=5)
+     #
+     chrnum<-length(scans)
+     parr<-lapply(1:chrnum,function(ichr){return(scans[[ichr]]$parr)})
+     parr<-do.call(rbind,parr)          
+     opfn<-paste(path,models[i],".parr.csv",sep="")
+     write.csv(parr,file=opfn,row.names=FALSE)
+     blupp<-lapply(1:chrnum,function(ichr){return(scans[[ichr]]$blupp)})
+     blupp<-do.call(rbind,blupp)              
+     opfn<-paste(path,models[i],".blupp.csv",sep="")
+     write.csv(blupp,file=opfn,row.names=FALSE) 
+     #
+     s1<-Sys.time()
+     Time<-data.frame(model=models[i],Start=s0,End=s1,Elapsed=s1-s0)
+     write.table(Time,file="Time.CC.txt",row.names=FALSE,quote=FALSE,sep="\t",append=TRUE)
+   },mc.cores=mc)   
+})
+
+##
+models<-"CIM"
+steps<-c(55,3)
+bychrs<-c(4,2)
+cimpre<-c(".co5",".co10")
+nsteps<-length(steps)
+#
+lapply(1:nphe,function(k){
+
+   path<-paste("./Data/Ara/",phe.name[k],"/",sep="")   
+   dir.create(path=path,recursive=TRUE,show=FALSE)
+   ii<-k+1
+   d<-data.frame(y=Phe[,ii],x=rep(1,indi))
+   
+   mc<-1
+   tmp<-mclapply(1:nsteps,function(i){   
+     cat(phe.name[k],"\n")
+     scans<-magicScan(dataframe=d,gen=gen,map=map,kk.eigen=kk.eigen,model=model,nfounders=19,window=5,step=steps[i],bychr=bychrs[i])
+     #
+     chrnum<-length(scans)
+     parr<-lapply(1:chrnum,function(ichr){return(scans[[ichr]]$parr)})
+     parr<-do.call(rbind,parr)          
+     opfn<-paste(path,models,cimpre[i],".parr.csv",sep="")
+     write.csv(parr,file=opfn,row.names=FALSE)
+     #
+     blupp<-lapply(1:chrnum,function(ichr){return(scans[[ichr]]$blupp)})
+     blupp<-do.call(rbind,blupp)              
+     opfn<-paste(path,models,cimpre[i],".blupp.csv",sep="")
+     write.csv(blupp,file=opfn,row.names=FALSE)     
+   },mc.cores=mc)
+})
+
+
+ 
+###II,permutation to obtain the threshold values 
+rm(list=ls())
+source("permutScan.R")
+#
+phe.name<-c("PMN","CXCL1")
+nphe<-length(phe.name)
+Phe<-read.csv(file="CC.phe.impute.csv",header=TRUE)
+Phe<-data.frame(subject.id=Phe[,1],PMN=log(Phe[,2]),CXCL1=log(Phe[,3]))
+indi<-nrow(Phe)
+load(file="CC.chrs.magic.RData")
+load(file="CC.chrs.kkship.RData")
+#
+models<-c("Random-A","Random-B","Fixed-A","Fixed-B","IM")
+nm<-length(models)
+num<-1000
+mc<-10
+lapply(1:nphe,function(k){
+#
+   path<-paste("./Data/Ara/",phe.name[k],"/",sep="")   
+   dir.create(path=path,recursive=TRUE,show=FALSE)
+   ii<-k+1
+   d<-data.frame(y=Phe[,ii],x=rep(1,indi))   
+   tmp<-lapply(1:nm,function(i){
+   pathout<-paste(path,models[i],sep="")
+   permutScan(pathout=pathout,dataframe=d,gen=gen,map=map,kk.eigen=kk.eigen,model=models[i],nfounders=19,window=5,num=num,mc=mc)
+   }
+}
+#  
+#CIM
+models<-"CIM"
+steps<-c(55,3)
+bychrs<-c(4,2)
+cimpre<-c(".co5",".co10")
+nsteps<-length(steps)
+num<-1000
+mc<-10
+lapply(1:nphe,function(k){
+#
+   path<-paste("./Data/Ara/",phe.name[k],"/",sep="")   
+   dir.create(path=path,recursive=TRUE,show=FALSE)
+   ii<-k+1
+   d<-data.frame(y=Phe[,ii],x=rep(1,indi))   
+   tmp<-lapply(1:nsteps,function(i){
+   pathout<-paste(path,models,cimpre[i],sep="")
+   permutScan(pathout=pathout,dataframe=d,gen=gen,map=map,kk.eigen=kk.eigen,model=models,nfounders=19,window=5,step=steps[i],bychr=bychrs[i],num=num,mc=mc)
+   }
+}
+#
